@@ -91,3 +91,35 @@ export function getProviderForModel(modelId: string): ProviderType {
   // Default to gemini
   return 'gemini';
 }
+
+/**
+ * Ensures that messages alternate between 'user' and 'assistant' roles.
+ * Merges consecutive messages of the same role and ensures the history starts with 'user'.
+ */
+export function squashMessages(messages: Message[]): Message[] {
+  if (messages.length === 0) return [];
+
+  const squashed: Message[] = [];
+  
+  // Filter out system messages as they are handled separately by providers
+  const filtered = messages.filter(m => m.role !== 'system');
+
+  for (const msg of filtered) {
+    if (!msg.content.trim()) continue; // Skip empty messages
+
+    const last = squashed[squashed.length - 1];
+    if (last && last.role === msg.role) {
+      // Merge consecutive messages of the same role
+      last.content += "\n\n" + msg.content;
+    } else {
+      squashed.push({ ...msg });
+    }
+  }
+
+  // Anthropic/Gemini/Perplexity often require starting with a 'user' message
+  while (squashed.length > 0 && squashed[0].role === 'assistant') {
+    squashed.shift();
+  }
+
+  return squashed;
+}

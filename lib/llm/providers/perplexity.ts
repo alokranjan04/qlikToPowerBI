@@ -1,4 +1,4 @@
-import { LLMProvider, Message, ChatResponse, ChatOptions } from '../index';
+import { LLMProvider, Message, ChatResponse, ChatOptions, squashMessages } from '../index';
 
 /**
  * Implementation for Perplexity AI API
@@ -13,13 +13,14 @@ export const perplexityProvider: LLMProvider = {
     }
 
     try {
+      const squashedMessages = squashMessages(messages);
       const mappedMessages = [];
       
       if (systemPrompt) {
         mappedMessages.push({ role: 'system', content: systemPrompt });
       }
 
-      mappedMessages.push(...messages.map(m => ({
+      mappedMessages.push(...squashedMessages.map(m => ({
         role: m.role,
         content: m.content
       })));

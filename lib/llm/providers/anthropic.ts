@@ -1,4 +1,4 @@
-import { LLMProvider, Message, ChatResponse, ChatOptions } from '../index';
+import { LLMProvider, Message, ChatResponse, ChatOptions, squashMessages } from '../index';
 
 /**
  * Example Implementation for Anthropic API (Claude)
@@ -14,7 +14,9 @@ export const anthropicProvider: LLMProvider = {
     }
 
     try {
-      const mappedMessages = messages.filter(m => m.role !== 'system').map(m => ({
+      const squashedMessages = squashMessages(messages);
+      
+      const mappedMessages = squashedMessages.map(m => ({
         role: m.role,
         content: m.content
       }));

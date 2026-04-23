@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { LLMProvider, Message, ChatResponse, ChatOptions } from '../index';
+import { LLMProvider, Message, ChatResponse, ChatOptions, squashMessages } from '../index';
 
 /**
  * Implementation for Google Gemini API
@@ -17,13 +17,12 @@ export const geminiProvider: LLMProvider = {
       const ai = new GoogleGenAI({ apiKey });
       const modelId = options?.model || 'gemini-3.1-pro-preview';
       
-      // Combine previous messages into a conversational history for Gemini.
-      const filteredMessages = messages.filter(m => m.role !== 'system');
-      const contents = filteredMessages.map((m, idx) => {
+      const squashedMessages = squashMessages(messages);
+      const contents = squashedMessages.map((m, idx) => {
         const parts: any[] = [{ text: m.content }];
         
         // If this is the last user message, attach any files
-        if (idx === filteredMessages.length - 1 && m.role === 'user' && options?.files) {
+        if (idx === squashedMessages.length - 1 && m.role === 'user' && options?.files) {
           options.files.forEach(file => {
             parts.push({
               inlineData: {
