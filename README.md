@@ -77,3 +77,9 @@ This project is a Next.js-based AI assistant for Power BI. It is built with a cl
 - The app currently defaults to `gemini` if `LLM_PROVIDER` is not explicitly configured.
 - Chat history is stored locally per mode for up to 30 days.
 - The `context` panel enables richer, data-aware answers by supplying the model with business or schema details.
+
+## Cloud Run deployment secrets
+
+- Do not commit your service account JSON file to the repository.
+- Use the GitHub Actions secret `GCP_SA_KEY` to store the JSON contents.
+- Keep local service account keys outside the repo, and ignore them with `.gitignore`.
