@@ -1,4 +1,4 @@
-import { LLMProvider, Message, ChatResponse } from '../index';
+import { LLMProvider, Message, ChatResponse, ChatOptions } from '../index';
 
 /**
  * Example Implementation for Anthropic API (Claude)
@@ -6,7 +6,7 @@ import { LLMProvider, Message, ChatResponse } from '../index';
  * that might require specific proxy or TLS settings.
  */
 export const anthropicProvider: LLMProvider = {
-  async chat(messages: Message[], systemPrompt?: string): Promise<ChatResponse> {
+  async chat(messages: Message[], systemPrompt?: string, options?: ChatOptions): Promise<ChatResponse> {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     
     if (!apiKey) {
@@ -21,6 +21,18 @@ export const anthropicProvider: LLMProvider = {
         content: m.content
       }));
 
+      const body: any = {
+        model: 'claude-3-5-sonnet-20241022', // Company approved model version
+        max_tokens: 4096,
+        system: systemPrompt || undefined,
+        messages: mappedMessages,
+      };
+
+      // Add temperature if specified
+      if (options?.temperature !== undefined) {
+        body.temperature = Math.max(0, Math.min(1, options.temperature)); // Clamp 0-1
+      }
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -28,12 +40,7 @@ export const anthropicProvider: LLMProvider = {
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022', // Company approved model version
-          max_tokens: 4096,
-          system: systemPrompt || undefined,
-          messages: mappedMessages,
-        })
+        body: JSON.stringify(body)
       });
 
       if (!response.ok) {

@@ -1,21 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Send, Copy, Check, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
-import { Message } from '@/lib/llm';
+import { Send, Copy, Check, RefreshCw, AlertCircle, Loader2, Paperclip, X } from 'lucide-react';
+import { Message, getAvailableModels } from '@/lib/llm';
 import { BIHelperMode } from '../layout/sidebar';
 
 interface ChatWindowProps {
   mode: BIHelperMode;
   contextParams: string;
+  temperature: number;
+  selectedModel: string;
 }
 
-export function ChatWindow({ mode, contextParams }: ChatWindowProps) {
+export function ChatWindow({ mode, contextParams, temperature, selectedModel }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const STORAGE_KEY = `pbi_assistant_history_${mode.replace(/\s+/g, '_')}`;
@@ -55,18 +59,46 @@ export function ChatWindow({ mode, contextParams }: ChatWindowProps) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachedFiles(prev => [...prev, ...files].slice(0, 5)); // Max 5 files
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input.trim(), timestamp: Date.now() };
     const newMessages = [...messages, userMessage];
     
     setMessages(newMessages);
+    const currentInput = input;
+    const currentFiles = [...attachedFiles];
+    
     setInput('');
+    setAttachedFiles([]);
     setIsLoading(true);
     setError(null);
 
     try {
+      // Read files as base64
+      const fileDataPromises = currentFiles.map(async (file) => {
+        return new Promise<{ name: string; type: string; data: string }>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            resolve({ name: file.name, type: file.type, data: base64 });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      });
+
+      const processedFiles = await Promise.all(fileDataPromises);
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -74,6 +106,9 @@ export function ChatWindow({ mode, contextParams }: ChatWindowProps) {
           messages: newMessages,
           context: contextParams,
           mode: mode,
+          temperature: temperature,
+          model: selectedModel,
+          files: processedFiles // Actual file content
         })
       });
 
@@ -107,8 +142,11 @@ export function ChatWindow({ mode, contextParams }: ChatWindowProps) {
   const clearChat = () => {
     setMessages([]);
     setError(null);
+    setAttachedFiles([]);
     localStorage.removeItem(STORAGE_KEY);
   };
+
+  const availableModels = getAvailableModels();
 
   return (
     <div className="flex-1 flex flex-col h-full bg-white relative">
@@ -212,9 +250,36 @@ export function ChatWindow({ mode, contextParams }: ChatWindowProps) {
       </div>
 
       <div className="p-6 bg-slate-50 border-t border-slate-200 flex flex-col shrink-0">
-        <div className="flex-1 relative max-w-3xl mx-auto w-full">
+        {/* Hidden File Input */}
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileSelect} 
+          multiple 
+          className="hidden" 
+        />
+
+        {/* Attached Files List */}
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3 max-w-3xl mx-auto w-full">
+            {attachedFiles.map((file, i) => (
+              <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-200 rounded text-[11px] font-medium text-slate-600 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+                <Paperclip className="w-3 h-3 text-slate-400" />
+                <span className="truncate max-w-[120px]">{file.name}</span>
+                <button 
+                  onClick={() => removeFile(i)}
+                  className="p-0.5 hover:bg-slate-100 rounded-full text-slate-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex-1 relative max-w-3xl mx-auto w-full group">
           <textarea
-            className="w-full h-full min-h-[60px] max-h-48 p-3 pr-20 border border-slate-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none shadow-sm resize-none bg-white text-slate-900"
+            className="w-full h-full min-h-[80px] max-h-48 p-4 pr-32 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none shadow-sm resize-none bg-white text-slate-900 transition-all"
             rows={2}
             placeholder={
               mode === 'DAX Generator' ? 'Describe your request or paste error message...' :
@@ -225,21 +290,30 @@ export function ChatWindow({ mode, contextParams }: ChatWindowProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <button
-            className={`absolute bottom-3 right-3 px-4 py-1.5 rounded text-xs font-bold transition-colors ${
-              input.trim() && !isLoading
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}
-            disabled={!input.trim() || isLoading}
-            onClick={handleSend}
-          >
-            RUN
-          </button>
+          <div className="absolute bottom-3 right-3 flex items-center gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Attach files (PDF, Images, etc.)"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+            <button
+              className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${
+                (input.trim() || attachedFiles.length > 0) && !isLoading
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-500/20'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              }`}
+              disabled={(!input.trim() && attachedFiles.length === 0) || isLoading}
+              onClick={handleSend}
+            >
+              {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'RUN'}
+            </button>
+          </div>
         </div>
         <div className="text-center mt-3">
           <span className="text-[10px] text-slate-400 uppercase tracking-widest font-mono">
-            Context Memory: 30 Days // Tokens limit approx active // Enterprise Usage
+            Gemini Flash // Context Memory: 30 Days // Enterprise Instance
           </span>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProvider, ProviderType, Message } from '@/lib/llm';
+import { getProvider, ProviderType, Message, getProviderForModel } from '@/lib/llm';
 
 // Set this via environment variable ideally, e.g. process.env.LLM_PROVIDER
 // To ensure it works out of the box in this preview environment, we fallback to gemini.
@@ -8,11 +8,14 @@ const DEFAULT_PROVIDER: ProviderType = (process.env.LLM_PROVIDER as ProviderType
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, context, mode } = body;
+    const { messages, context, mode, temperature = 0.7, model, files } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Valid messages array is required' }, { status: 400 });
     }
+
+    // Validate temperature is between 0 and 1
+    const validTemperature = Math.max(0, Math.min(1, temperature));
 
     // Compose a rich system prompt based on mode and context
     let systemPrompt = `You are an internal enterprise Power BI expert assistant.
@@ -35,10 +38,20 @@ Always return complete, ready-to-use code, DAX, or structured guidance. Avoid ex
       systemPrompt += `\n\n=== BUSINESS / DATA MODEL CONTEXT START ===\n${context}\n=== BUSINESS / DATA MODEL CONTEXT END ==="\nUse the above context to inform all your answers.\n`;
     }
 
+    // Determine provider based on model selection
+    let providerType: ProviderType = DEFAULT_PROVIDER;
+    if (model) {
+      providerType = getProviderForModel(model);
+    }
+
     // Using enterprise Provider abstraction
-    const provider = getProvider(DEFAULT_PROVIDER);
+    const provider = getProvider(providerType);
     
-    const response = await provider.chat(messages, systemPrompt);
+    const response = await provider.chat(messages, systemPrompt, {
+      temperature: validTemperature,
+      model: model,
+      files: files
+    });
 
     if (response.error) {
       return NextResponse.json({ error: response.error }, { status: 500 });
