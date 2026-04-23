@@ -26,21 +26,29 @@ jobs:
       - name: Build application
         run: npm run build
 
-      - name: Set up Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
         with:
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          project_id: ${{ secrets.GCP_PROJECT }}
-          export_default_credentials: true
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Configure Docker for Artifact Registry
+        run: |
+          gcloud auth configure-docker us-central1-docker.pkg.dev
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/voice-ai-repo/${{ secrets.CLOUD_RUN_SERVICE }}:${{ github.sha }} .
+          docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/voice-ai-repo/${{ secrets.CLOUD_RUN_SERVICE }}:${{ github.sha }}
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud config set project ${{ secrets.GCP_PROJECT }}
-          gcloud config set run/region ${{ secrets.CLOUD_RUN_REGION }}
-          gcloud builds submit --tag gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.CLOUD_RUN_SERVICE }}:${{ github.sha }} .
           gcloud run deploy ${{ secrets.CLOUD_RUN_SERVICE }} \
-            --image gcr.io/${{ secrets.GCP_PROJECT }}/${{ secrets.CLOUD_RUN_SERVICE }}:${{ github.sha }} \
+            --image us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT }}/voice-ai-repo/${{ secrets.CLOUD_RUN_SERVICE }}:${{ github.sha }} \
             --region ${{ secrets.CLOUD_RUN_REGION }} \
             --platform managed \
             --allow-unauthenticated \
+            --project ${{ secrets.GCP_PROJECT }} \
             --set-env-vars LLM_PROVIDER=${{ secrets.LLM_PROVIDER }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},APP_URL=${{ secrets.APP_URL }}
