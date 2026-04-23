@@ -1,0 +1,6 @@
+{
+  "name": "Power BI Internal Assistant",
+  "description": "Company-safe internal AI assistant for Power BI developers, enabling DAX generation, explanation, and visual recommendations via secure Next.js server-side API calls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
