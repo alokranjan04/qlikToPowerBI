@@ -7,6 +7,7 @@ interface SidebarProps {
   chats: Chat[];
   currentChatId: string | null;
   onChatSelect: (id: string) => void;
+  onChatDelete: (id: string) => void;
   onNewChat: () => void;
 }
 
