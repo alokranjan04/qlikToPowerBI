@@ -51,4 +51,4 @@ jobs:
             --platform managed \
             --allow-unauthenticated \
             --project ${{ secrets.GCP_PROJECT }} \
-            --set-env-vars LLM_PROVIDER=${{ secrets.LLM_PROVIDER }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},APP_URL=${{ secrets.APP_URL }}
+            --set-env-vars LLM_PROVIDER=${{ secrets.LLM_PROVIDER }},GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},APP_URL=${{ secrets.APP_URL }},PERPLEXITY_KEY=${{ secrets.PERPLEXITY_KEY }},CLAUDE_KEY=${{ secrets.CLAUDE_KEY }}
