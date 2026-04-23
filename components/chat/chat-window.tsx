@@ -10,10 +10,20 @@ interface ChatWindowProps {
   contextParams: string;
   temperature: number;
   selectedModel: string;
+  messages: Message[];
+  onMessagesChange: (messages: Message[]) => void;
+  onNewChat: () => void;
 }
 
-export function ChatWindow({ mode, contextParams, temperature, selectedModel }: ChatWindowProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export function ChatWindow({ 
+  mode, 
+  contextParams, 
+  temperature, 
+  selectedModel,
+  messages,
+  onMessagesChange,
+  onNewChat
+}: ChatWindowProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,39 +31,6 @@ export function ChatWindow({ mode, contextParams, temperature, selectedModel }: 
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  const STORAGE_KEY = `pbi_assistant_history_${mode.replace(/\s+/g, '_')}`;
-
-  // Load history on mount or mode change
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed: Message[] = JSON.parse(saved);
-        // Retain messages from the last 30 days
-        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-        const now = Date.now();
-        const recentMessages = parsed.filter(
-          (m) => !m.timestamp || (now - m.timestamp < thirtyDaysMs)
-        );
-        setMessages(recentMessages);
-      } else {
-        setMessages([]);
-      }
-    } catch (e) {
-      console.error('Failed to load chat history', e);
-      setMessages([]);
-    }
-  }, [mode, STORAGE_KEY]);
-
-  // Save history whenever messages change
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [messages, STORAGE_KEY]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -74,7 +51,7 @@ export function ChatWindow({ mode, contextParams, temperature, selectedModel }: 
     const userMessage: Message = { role: 'user', content: input.trim(), timestamp: Date.now() };
     const newMessages = [...messages, userMessage];
     
-    setMessages(newMessages);
+    onMessagesChange(newMessages);
     const currentInput = input;
     const currentFiles = [...attachedFiles];
     
@@ -118,7 +95,7 @@ export function ChatWindow({ mode, contextParams, temperature, selectedModel }: 
         throw new Error(data.error || 'Failed to fetch response');
       }
 
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.result, timestamp: Date.now() }]);
+      onMessagesChange([...newMessages, { role: 'assistant', content: data.result, timestamp: Date.now() }]);
     } catch (err: any) {
       setError(err.message || 'An error occurred. Check browser console.');
     } finally {
@@ -140,10 +117,7 @@ export function ChatWindow({ mode, contextParams, temperature, selectedModel }: 
   };
 
   const clearChat = () => {
-    setMessages([]);
-    setError(null);
-    setAttachedFiles([]);
-    localStorage.removeItem(STORAGE_KEY);
+    onNewChat();
   };
 
   const availableModels = getAvailableModels();

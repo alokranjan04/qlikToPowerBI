@@ -1,3 +1,8 @@
+import { geminiProvider } from './providers/gemini';
+import { anthropicProvider } from './providers/anthropic';
+import { azureOpenAIProvider } from './providers/azure-openai';
+import { perplexityProvider } from './providers/perplexity';
+
 export type Role = 'user' | 'assistant' | 'system';
 
 export interface Message {
@@ -24,7 +29,7 @@ export interface LLMProvider {
   chat(messages: Message[], systemPrompt?: string, options?: ChatOptions): Promise<ChatResponse>;
 }
 
-export type ProviderType = 'anthropic' | 'azure' | 'gemini';
+export type ProviderType = 'anthropic' | 'azure' | 'gemini' | 'perplexity';
 
 export const MODEL_CONFIG: Record<string, { provider: ProviderType; id: string; name: string }> = {
   'gemini-3.1-pro': {
@@ -32,20 +37,20 @@ export const MODEL_CONFIG: Record<string, { provider: ProviderType; id: string; 
     id: 'gemini-3.1-pro-preview',
     name: 'Gemini 3.1 Pro'
   },
-  'gemini-1.5-pro': {
-    provider: 'gemini',
-    id: 'gemini-1.5-pro',
-    name: 'Gemini 1.5 Pro'
-  },
-  'gemini-1.5-flash': {
-    provider: 'gemini',
-    id: 'gemini-1.5-flash',
-    name: 'Gemini 1.5 Flash'
-  },
-  'claude-3-5-sonnet': {
+  'claude-3-7-sonnet': {
     provider: 'anthropic',
-    id: 'claude-3-5-sonnet-20241022',
-    name: 'Claude 3.5 Sonnet'
+    id: 'claude-3-7-sonnet-20250219',
+    name: 'Claude 3.7 Sonnet'
+  },
+  'perplexity-sonar-pro': {
+    provider: 'perplexity',
+    id: 'sonar-pro',
+    name: 'Perplexity Sonar Pro'
+  },
+  'perplexity-sonar-reasoning': {
+    provider: 'perplexity',
+    id: 'sonar-reasoning-pro',
+    name: 'Perplexity Sonar Reasoning'
   },
   'azure-gpt-4': {
     provider: 'azure',
@@ -57,11 +62,13 @@ export const MODEL_CONFIG: Record<string, { provider: ProviderType; id: string; 
 export function getProvider(type: ProviderType): LLMProvider {
   switch (type) {
     case 'anthropic':
-      return require('./providers/anthropic').anthropicProvider;
+      return anthropicProvider;
     case 'azure':
-      return require('./providers/azure-openai').azureOpenAIProvider;
+      return azureOpenAIProvider;
     case 'gemini':
-      return require('./providers/gemini').geminiProvider;
+      return geminiProvider;
+    case 'perplexity':
+      return perplexityProvider;
     default:
       throw new Error(`Unknown provider type: ${type}`);
   }

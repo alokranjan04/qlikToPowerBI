@@ -7,31 +7,25 @@ import { LLMProvider, Message, ChatResponse, ChatOptions } from '../index';
  */
 export const anthropicProvider: LLMProvider = {
   async chat(messages: Message[], systemPrompt?: string, options?: ChatOptions): Promise<ChatResponse> {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.CLAUDE_KEY || process.env.ANTHROPIC_API_KEY;
     
     if (!apiKey) {
-      return { content: '', error: 'Anthropic API key is not configured on the server.' };
+      return { content: '', error: 'Claude/Anthropic API key is not configured.' };
     }
 
     try {
-      // Map generic messages to Anthropic's expected format
-      // Note: Anthropic extracts system prompt separately from the messages array
       const mappedMessages = messages.filter(m => m.role !== 'system').map(m => ({
         role: m.role,
         content: m.content
       }));
 
       const body: any = {
-        model: 'claude-3-5-sonnet-20241022', // Company approved model version
+        model: options?.model || 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         system: systemPrompt || undefined,
         messages: mappedMessages,
+        temperature: options?.temperature !== undefined ? Math.max(0, Math.min(1, options.temperature)) : 0.7
       };
-
-      // Add temperature if specified
-      if (options?.temperature !== undefined) {
-        body.temperature = Math.max(0, Math.min(1, options.temperature)); // Clamp 0-1
-      }
 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
